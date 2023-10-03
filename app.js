@@ -5,9 +5,9 @@ import express from "express"
 import bodyParser from "body-parser"
 import ejs from "ejs"
 import mongoose from "mongoose"
-import encrypt from "mongoose-encryption"
-import md5 from "md5"
+import bcrypt from "bcrypt"
 
+const saltRounds = 10
 const app = express()
 const port = 3000
 
@@ -42,28 +42,37 @@ app.get("/logout", (req, res) => {
 
 app.post("/register", (req, res) => {
     const username = req.body.username
-    const password = md5(req.body.password)
-
-    const newUser = new User({
-        email: username,
-        password: password
-    })
-
-    newUser.save()
-
-    res.render("secrets")
+    const password = req.body.password
+    bcrypt.hash(password, saltRounds, function(err, hash) {
+        const newUser = new User({
+            email: username,
+            password: hash
+        })
+    
+        newUser.save()
+        .then(() => {
+            res.render("secrets")
+        })
+        .catch(err => {
+            console.log(err)
+        })
+    });
 })
 
 app.post("/login", (req, res) => {
     const username = req.body.username
-    const password = md5(req.body.password)
+    const password = req.body.password
 
     User.findOne({email: username})
     .then(found => {
         if (found) {
-            if (found.password === password) {
-                res.render("secrets")
-            }
+            bcrypt.compare(password, found.password, function(err, result) {
+                if (result === true) {
+                    res.render("secrets")
+                } else {
+                    console.log("wrong password")
+                }
+            });
         } else {
             res.send("wrong email")
         }
